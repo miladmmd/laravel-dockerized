@@ -1,0 +1,85 @@
+
+networks:
+    default:
+        name: ${NETWORK_NAME}
+volumes:
+    database:
+        driver: local
+
+    rabbit-data:
+        driver: local
+
+services:
+    nginx:
+        image: nginx:1.23.4
+        container_name: ${NGINX_CONTAINER_NAME}
+        restart: unless-stopped
+        tty: true
+        ports:
+            - "8003:8000"
+        volumes:
+            - ./:/var/www/html
+            - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+        depends_on:
+            - php
+            - database
+        networks:
+            - default
+
+    database:
+        platform: linux/amd64
+        image: mysql
+        container_name: ${DATABASE_CONTAINER_NAME}
+        restart: unless-stopped
+        tty: true
+        ports:
+            - "4309:3306"
+        volumes:
+            - database:/var/lib/mysql
+        environment:
+            MYSQL_DATABASE: dockerized-laravel
+            MYSQL_USER: user
+            MYSQL_PASSWORD: user
+            MYSQL_ROOT_PASSWORD: root
+            SERVICE_NAME: mysql
+        networks:
+            - default
+
+    php:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: ${APP_CONTAINER_NAME}
+        restart: unless-stopped
+        tty: true
+        working_dir: /var/www/html
+        volumes:
+            - ./:/var/www/html
+        networks:
+            - default
+
+    rabbitmq:
+        image: heidiks/rabbitmq-delayed-message-exchange:3.11.28-management
+        container_name: ${RABBIT_CONTAINER_NAME}
+        restart: always
+        ports:
+            - 5675:5672
+            - 15679:15672  # Change the first port number to your desired host port for management UI
+        environment:
+            RABBITMQ_DEFAULT_USER: root
+            RABBITMQ_DEFAULT_PASS: root
+            RABBITMQ_DEFAULT_VHOST: /
+        volumes:
+            - rabbit-data:/var/lib/rabbitmq
+        networks:
+            - default
+
+    redis:
+        image: redis:6.2
+        container_name: redis-laravel-dockerized
+        restart: unless-stopped
+        ports:
+            - "6381:6379"
+        networks:
+            - default
+
